@@ -34,6 +34,7 @@ def get_transform(center, scale, res, rot=0):
 
 def transform(pt, center, scale, res, invert=0, rot=0):
     # Transform pixel location to different reference
+    # 大概就是求出一个变换矩阵，rot为旋转角度。具体的公式这里就不推了。
     t = get_transform(center, scale, res, rot=rot)
     if invert:
         t = np.linalg.inv(t)

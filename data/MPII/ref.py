@@ -17,6 +17,7 @@ import cv2
 
 class MPII:
     def __init__(self):
+        # 这里直接把训练集和验证集揉把在一起了，但是在getlength函数里仍会返回两个集合各自的长度，具体的被放在了上面两个全局变量里面。
         print('loading data...')
         tic = time.time()
 
@@ -53,6 +54,7 @@ class MPII:
     def getAnnots(self, idx):
         '''
         returns h5 file for train or val set
+        注意这里只是存了图像的尺寸、关节位置、中心点啥的参数，并没有图像本身，所以整体大小还算可控。
         '''
         return self.imgname[idx], self.part[idx], self.visible[idx], self.center[idx], self.scale[idx], self.normalize[idx]
     
@@ -82,23 +84,29 @@ def setup_val_split():
     returns index for train and validation imgs
     index for validation images starts after that of train images
     so that loadImage can tell them apart
+    根据保留的长度仍能够区分两个集合。
+    注意这里返回的两个集合仅为数组索引，即[1,2,3,...,num_examples_train]这样的连续区间
+    （为什么不直接传两个长度回去还整个数组。。。）
     '''
     valid = [i+num_examples_train for i in range(num_examples_val)]
     train = [i for i in range(num_examples_train)]
     return np.array(train), np.array(valid)
     
 def get_img(idx):
+    # 因为没有存图像所以需要按照文件名去找。
     imgname, __, __, __, __, __ = mpii.getAnnots(idx)
     path = os.path.join(img_dir, imgname)
     img = imread(path)
     return img
 
 def get_path(idx):
+    # 只返回图像位置而不读取。
     imgname, __, __, __, __, __ = mpii.getAnnots(idx)
     path = os.path.join(img_dir, imgname)
     return path
     
 def get_kps(idx):
+    # 返回关节点信息。
     __, part, visible, __, __, __ = mpii.getAnnots(idx)
     kp2 = np.insert(part, 2, visible, axis=1)
     kps = np.zeros((1, 16, 3))

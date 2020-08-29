@@ -6,8 +6,15 @@ import numpy as np
 import torch.utils.data
 import utils.img
 
+# data_provider即数据生成
+
 class GenerateHeatmap():
     def __init__(self, output_res, num_parts):
+        """
+        这里得到的高斯分布中心点在x0和y0处。
+        :param output_res:
+        :param num_parts:
+        """
         self.output_res = output_res
         self.num_parts = num_parts
         sigma = self.output_res/64
@@ -30,6 +37,12 @@ class GenerateHeatmap():
                     ul = int(x - 3*sigma - 1), int(y - 3*sigma - 1)
                     br = int(x + 3*sigma + 2), int(y + 3*sigma + 2)
 
+                    """
+                    大概是这样圈出来每个关节周围sigma的范围，然后只有在这个sigma范围内才算是关节，根据上面得到的高斯分布来标定。
+                    ul b 
+                    c     d
+                       a br
+                    """
                     c,d = max(0, -ul[0]), min(br[0], self.output_res) - ul[0]
                     a,b = max(0, -ul[1]), min(br[1], self.output_res) - ul[1]
 
@@ -40,8 +53,16 @@ class GenerateHeatmap():
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, config, ds, index):
-        self.input_res = config['train']['input_res']
+        """
+
+        :param config: 最外面的全区设置
+        :param ds: .ref文件中初始化得到的train和test集啥的
+        :param index: 在ref中吐槽的数据集索引数组，训练集就是[1,2,3,...,NUM_TRAIN]，测试集就是[NUM_TRAIN+1,...,NUM_TRAIN+NUM_VAL]。
+        """
+        self.input_res = config['train']['input_res']   # 分辨率
         self.output_res = config['train']['output_res']
+
+        # 初始化时仅生成一幅标准高斯噪声，之后调用__call__才会生成具体的关节图heatmap。
         self.generateHeatmap = GenerateHeatmap(self.output_res, config['inference']['num_parts'])
         self.ds = ds
         self.index = index
@@ -50,6 +71,7 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.index)
 
     def __getitem__(self, idx):
+        # 为什么还要再写一个函数。。。
         return self.loadImage(self.index[idx % len(self.index)])
 
     def loadImage(self, idx):
@@ -76,8 +98,10 @@ class Dataset(torch.utils.data.Dataset):
         scale = max(height, width)/200
 
         aug_rot=0
-        
+
+        # -30～+30度旋转
         aug_rot = (np.random.random() * 2 - 1) * 30.
+        # 0.75~1.25缩放
         aug_scale = np.random.random() * (1.25 - 0.75) + 0.75
         scale *= aug_scale
             
@@ -110,7 +134,7 @@ class Dataset(torch.utils.data.Dataset):
     def preprocess(self, data):
         # random hue and saturation
         data = cv2.cvtColor(data, cv2.COLOR_RGB2HSV);
-        delta = (np.random.random() * 2 - 1) * 0.2
+        delta = (np.random.random() * 2 - 1) * 0.2  # -0.2~0.2
         data[:, :, 0] = np.mod(data[:,:,0] + (delta * 360 + 360.), 360.)
 
         delta_sature = np.random.random() + 0.5
@@ -133,11 +157,14 @@ def init(config):
     batchsize = config['train']['batchsize']
     current_path = os.path.dirname(os.path.abspath(__file__))
     sys.path.append(current_path)
-    import ref as ds
+    from . import ref as ds
     ds.init()
 
     train, valid = ds.setup_val_split()
+
+    # 就特么两个数据集你揉把来揉把去干啥啊。。。最后不还是一个训练一个验证的Dataset吗。。。
     dataset = { key: Dataset(config, ds, data) for key, data in zip( ['train', 'valid'], [train, valid] ) }
+    # 仔细看过一边之后基本是常规方法，至于写成这样会不会更快我不知道，但是数据处理的代码风格还是推荐之前CPM的写法。。。
 
     use_data_loader = config['train']['use_data_loader']
 
@@ -146,6 +173,11 @@ def init(config):
         loaders[key] = torch.utils.data.DataLoader(dataset[key], batch_size=batchsize, shuffle=True, num_workers=config['train']['num_workers'], pin_memory=False)
 
     def gen(phase):
+        """
+        这里还是可以简单学一下生成器的写法的，虽然pytorch中的Dataloader已经足够好。。。
+        :param phase:
+        :return:
+        """
         batchsize = config['train']['batchsize']
         batchnum = config['train']['{}_iters'.format(phase)]
         loader = loaders[phase].__iter__()
@@ -156,7 +188,7 @@ def init(config):
                 # to avoid no data provided by dataloader
                 loader = loaders[phase].__iter__()
                 imgs, heatmaps = next(loader)
-            yield {
+            yield {     # 在生成器中，yield就像return一样能够打断函数并返回参数，但不同的是下次调用生成器时直接接着yield运行，不想return会从头开始。
                 'imgs': imgs, #cropped and augmented
                 'heatmaps': heatmaps, #based on keypoints. 0 if not in img for joint
             }

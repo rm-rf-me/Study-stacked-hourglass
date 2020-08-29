@@ -5,6 +5,11 @@ import importlib
 # Helpers when setting up training
 
 def importNet(net):
+    """
+
+    :param net: 用.分隔的模型路径字符串
+    :return: 找到这个.分隔的模型路径中的最后一个名字，即模型名字，然后运行它？（直接写不行吗。。。）
+    """
     t = net.split('.')
     path, name = '.'.join(t[:-1]), t[-1]
     module = importlib.import_module(path)

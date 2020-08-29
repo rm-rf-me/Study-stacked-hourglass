@@ -16,14 +16,15 @@ import shutil
 
 def parse_command_line():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--continue_exp', type=str, help='continue exp')
-    parser.add_argument('-e', '--exp', type=str, default='pose', help='experiments name')
+    parser.add_argument('-c', '--continue_exp', type=str, help='continue exp')  # 是否继续训练
+    parser.add_argument('-e', '--exp', type=str, default='pose', help='experiments name')   # 模型名字
     parser.add_argument('-m', '--max_iters', type=int, default=250, help='max number of iterations (thousands)')
     args = parser.parse_args()
     return args
 
 def reload(config):
     """
+    即继续训练，如果存档存在即可以加载模型参数和设置。
     load or initialize model's parameters by config from config['opt'].continue_exp
     config['train']['epoch'] records the epoch num
     config['inference']['net'] is the model
@@ -61,6 +62,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pt'):
         shutil.copyfile(filename, 'model_best.pt')
 
 def save(config):
+    # 保存模型
     resume = os.path.join('exp', config['opt'].exp)
     if config['opt'].exp=='pose' and config['opt'].continue_exp is not None:
         resume = os.path.join('exp', config['opt'].continue_exp)
@@ -103,6 +105,8 @@ def init():
     make_network builds a function which can do forward and backward propagation
     """
     opt = parse_command_line()
+
+    # 其实是引用了当前文件目录中的task/pose.py文件，里面包括整体模型的参数设置，还有训练器。
     task = importlib.import_module('task.pose')
     exp_path = os.path.join('exp', opt.exp)
     
