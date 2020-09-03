@@ -6,6 +6,11 @@ def batchnorm(x):
     return nn.BatchNorm2d(x.size()[1])(x)
 
 class Conv(nn.Module):
+    """
+    2d卷积
+    先batchnorm再ReLU，默认有ReLU但是没有BN
+    默认小核
+    """
     def __init__(self, inp_dim, out_dim, kernel_size=3, stride = 1, bn = False, relu = True):
         super(Conv, self).__init__()
         self.inp_dim = inp_dim
@@ -27,6 +32,20 @@ class Conv(nn.Module):
         return x
     
 class Residual(nn.Module):
+    """
+
+    BatchNorm1
+    ReLU
+    Conv1 通道数减半 单核卷积
+    BatchNorm2
+    ReLU
+    Conv3 通道数不变 3*3
+    BatchNorm3
+    Conv3 通道数增倍 单核卷积
+    残差合并
+
+    如果输入维度和输出维度相同则没有skip layer即单核卷积调整通道数，否则残差直接为x
+    """
     def __init__(self, inp_dim, out_dim):
         super(Residual, self).__init__()
         self.relu = nn.ReLU()
@@ -60,17 +79,30 @@ class Residual(nn.Module):
         return out 
 
 class Hourglass(nn.Module):
+    """
+    模型的建立用了一个非常巧妙的递归结构，能够极大的减少代码量，并且能够建立任意层数的结构。
+    具体的模型图可以餐参照原论文，大致分为pool将为降维和上采样升维两部分。
+    每个部分具体为：
+        先过通道不变残差块
+        二倍减小Pool
+        通道增加残差块
+        递归建立下层低维部分
+        通道减少残差块
+        二倍增大上采样
+
+        最终上采样输出和输入残差相加
+    """
     def __init__(self, n, f, bn=None, increase=0):
         super(Hourglass, self).__init__()
         nf = f + increase
         self.up1 = Residual(f, f)
         # Lower branch
-        self.pool1 = Pool(2, 2)
+        self.pool1 = Pool(2, 2)             # 一次pool减少一倍
         self.low1 = Residual(f, nf)
         self.n = n
         # Recursive hourglass
         if self.n > 1:
-            self.low2 = Hourglass(n-1, nf, bn=bn)
+            self.low2 = Hourglass(n-1, nf, bn=bn)   # 这个递归好nb
         else:
             self.low2 = Residual(nf, nf)
         self.low3 = Residual(nf, f)

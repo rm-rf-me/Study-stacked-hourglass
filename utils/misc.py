@@ -16,12 +16,14 @@ def importNet(net):
     return eval('module.{}'.format(name))
 
 def make_input(t, requires_grad=False, need_cuda = True):
+    # 就是将输入转化为对应的torch变量。
     inp = torch.autograd.Variable(t, requires_grad=requires_grad)
     if need_cuda:
         inp = inp.cuda()
     return inp
 
 def make_output(x):
+    # 将torch变量变为numpy返回
     if not (type(x) is list):
         return x.cpu().data.numpy()
     else:

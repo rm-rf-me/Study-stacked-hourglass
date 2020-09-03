@@ -9,6 +9,12 @@ class UnFlatten(nn.Module):
 
 class Merge(nn.Module):
     def __init__(self, x_dim, y_dim):
+        """
+        单核卷积整合通道数
+        无BN和ReLU
+        :param x_dim:
+        :param y_dim:
+        """
         super(Merge, self).__init__()
         self.conv = Conv(x_dim, y_dim, 1, relu=False, bn=False)
 
@@ -26,14 +32,14 @@ class PoseNet(nn.Module):
             Pool(2, 2),
             Residual(128, 128),
             Residual(128, inp_dim)
-        )
+        )   # 预处理部分
         
-        self.hgs = nn.ModuleList( [
+        self.hgs = nn.ModuleList( [     # 每一个都叠四层
         nn.Sequential(
             Hourglass(4, inp_dim, bn, increase),
         ) for i in range(nstack)] )
         
-        self.features = nn.ModuleList( [
+        self.features = nn.ModuleList( [    # 残差块和单核卷积叠加，不改变通道数
         nn.Sequential(
             Residual(inp_dim, inp_dim),
             Conv(inp_dim, inp_dim, 1, bn=True, relu=True)
@@ -48,8 +54,17 @@ class PoseNet(nn.Module):
     def forward(self, imgs):
         ## our posenet
         x = imgs.permute(0, 3, 1, 2) #x of size 1,3,inpdim,inpdim
-        x = self.pre(x)
+        x = self.pre(x)     # 先经过预处理
         combined_hm_preds = []
+
+        """
+        每次nstack中：
+            经过Hourglass模块，输入输出都为inp_dim
+            经过特征模块，输入输出都为inp_dim
+            经过输出模块，输入为inp_dim，输出为out_dim，即K+1个通道
+            
+            非最后一层都需要给输入合并残差，包括预测残差和特征残差
+        """
         for i in range(self.nstack):
             hg = self.hgs[i](x)
             feature = self.features[i](hg)

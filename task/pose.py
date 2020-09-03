@@ -92,12 +92,14 @@ def make_network(configs):
         exp_path = os.path.join('exp', configs['opt'].continue_exp)
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
+
+    # 写log的习惯还是很重要的
     logger = open(os.path.join(exp_path, 'log'), 'a+')
 
     def make_train(batch_id, config, phase, **inputs):
         for i in inputs:
             try:
-                inputs[i] = make_input(inputs[i])
+                inputs[i] = make_input(inputs[i])   # 将inputs[i]变为torch变量。
             except:
                 pass #for last input, which is a string (id_)
                 
@@ -110,6 +112,7 @@ def make_network(configs):
             result = net(inputs['imgs'], **{i:inputs[i] for i in inputs if i!='imgs'})
             num_loss = len(config['train']['loss'])
 
+            # intermedia supervise
             losses = {i[0]: result[-num_loss + idx]*i[1] for idx, i in enumerate(config['train']['loss'])}
                         
             loss = 0
