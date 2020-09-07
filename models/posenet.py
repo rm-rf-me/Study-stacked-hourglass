@@ -64,6 +64,8 @@ class PoseNet(nn.Module):
             经过输出模块，输入为inp_dim，输出为out_dim，即K+1个通道
             
             非最后一层都需要给输入合并残差，包括预测残差和特征残差
+            
+            具体见原文中图4的右图
         """
         for i in range(self.nstack):
             hg = self.hgs[i](x)
